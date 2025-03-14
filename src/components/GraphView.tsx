@@ -7,9 +7,22 @@ import { DataSet } from "vis-data";
 interface NodeData {
   id: string;
   label: string;
-  shape?: string;
-  color?: any;
-  font?: any;
+  shape?: "circle" | "box" | "ellipse" | "database" | "text" | "diamond";
+  color?:
+    | string
+    | {
+        border: string;
+        background: string;
+        highlight: { border: string; background: string };
+        hover: { border: string; background: string };
+      };
+  font?: {
+    size?: number;
+    color?: string;
+    face?: string;
+    vadjust?: number;
+    bold?: string | { color: string; size: number; face: string };
+  };
   borderWidth?: number;
 }
 

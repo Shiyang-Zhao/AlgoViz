@@ -16,9 +16,9 @@ export default function GraphVisualizer() {
     const traversalOrder: string[] = [];
 
     if (algorithm === "bfs") {
-      let queue: string[] = ["1"];
+      const queue: string[] = ["1"];
       while (queue.length > 0) {
-        let node = queue.shift();
+        const node = queue.shift();
         if (node && !visited.has(node)) {
           visited.add(node);
           traversalOrder.push(node);
