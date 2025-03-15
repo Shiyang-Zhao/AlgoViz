@@ -188,7 +188,6 @@ const GraphView = ({ order, isRunning, setIsRunning }: {
 
     // Cleanup function for this effect
     return () => {
-      // We don't cancel the animation here anymore
       // This prevents cancellation when the component re-renders
     };
   }, [isRunning, setIsRunning, order]);
