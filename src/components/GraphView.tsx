@@ -34,10 +34,21 @@ interface ExtendedNetwork extends Network {
   };
 }
 
-const GraphView = ({ order }: { order: string[] }) => {
+const GraphView = ({ order, isRunning, setIsRunning }: { 
+  order: string[]; 
+  isRunning: boolean;
+  setIsRunning: (state: boolean) => void;
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<ExtendedNetwork | null>(null);
   const [currentStep, setCurrentStep] = useState<number>(-1);
+  const animationRef = useRef<{ cancel: boolean; running: boolean }>({ cancel: false, running: false });
+  const orderRef = useRef<string[]>([]);
+
+  // Update the orderRef when order changes
+  useEffect(() => {
+    orderRef.current = order;
+  }, [order]);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -74,68 +85,122 @@ const GraphView = ({ order }: { order: string[] }) => {
         options
       ) as ExtendedNetwork;
     }
+
+    return () => {
+      // Cleanup function
+      animationRef.current.cancel = true;
+    };
   }, []);
 
+  // Start traversal when isRunning becomes true
   useEffect(() => {
-    const network = networkRef.current;
-    if (!network) return;
+    if (!isRunning || !networkRef.current || order.length === 0) return;
 
-    const resetNodeColors = () => {
-      network.body.data.nodes.forEach((node) => {
-        network.body.data.nodes.update({
-          id: node.id,
-          color: { background: "#ecf0f1" },
-          label: `Node ${node.id}`,
-          font: { color: "#34495e", size: 14 },
+    // If another animation is already running, cancel it first
+    if (animationRef.current.running) {
+      animationRef.current.cancel = true;
+      // Give a small delay to ensure the previous animation cleans up
+      setTimeout(() => {
+        animationRef.current = { cancel: false, running: false };
+        startTraversal();
+      }, 100);
+    } else {
+      startTraversal();
+    }
+
+    function startTraversal() {
+      const network = networkRef.current;
+      if (!network) return;
+
+      // Mark as running
+      animationRef.current.running = true;
+      animationRef.current.cancel = false;
+
+      const resetNodeColors = () => {
+        network.body.data.nodes.forEach((node) => {
+          network.body.data.nodes.update({
+            id: node.id,
+            color: { background: "#ecf0f1" },
+            label: `Node ${node.id}`,
+            font: { color: "#34495e", size: 14 },
+          });
         });
-      });
+      };
+
+      const highlightTraversal = async () => {
+        resetNodeColors();
+        setCurrentStep(-1);  // Reset step indicator
+
+        // Use the current order from the ref to prevent closure issues
+        const currentOrder = [...orderRef.current];
+
+        for (let i = 0; i < currentOrder.length; i++) {
+          // Check if animation should be canceled
+          if (animationRef.current.cancel) {
+            break;
+          }
+
+          const nodeId = currentOrder[i];
+          setCurrentStep(i);
+
+          network.selectNodes([nodeId]);
+          network.focus(nodeId, {
+            scale: 1.2,
+            animation: { duration: 700, easingFunction: "easeInOutQuad" },
+          });
+
+          // Active node color
+          network.body.data.nodes.update({
+            id: nodeId,
+            color: { background: "#e74c3c" },
+            label: `Node ${nodeId}\n(${i + 1})`,
+            font: { color: "#ffffff", size: 14 },
+          });
+
+          // Wait for animation
+          await new Promise((resolve) => {
+            const timeout = setTimeout(resolve, 1000);
+            // Store the timeout to be able to clear it if canceled
+            return () => clearTimeout(timeout);
+          });
+
+          // If canceled, break out of the loop
+          if (animationRef.current.cancel) {
+            break;
+          }
+
+          // Visited node color
+          network.body.data.nodes.update({
+            id: nodeId,
+            color: { background: "#2ecc71" },
+          });
+        }
+
+        // Clean up after traversal completes or is canceled
+        network.unselectAll();
+        animationRef.current.running = false;
+        setCurrentStep(-1);
+        setIsRunning(false);
+      };
+
+      highlightTraversal();
+    }
+
+    // Cleanup function for this effect
+    return () => {
+      // We don't cancel the animation here anymore
+      // This prevents cancellation when the component re-renders
     };
-
-    const highlightTraversal = async () => {
-      resetNodeColors();
-
-      for (let i = 0; i < order.length; i++) {
-        const nodeId = order[i];
-        setCurrentStep(i);
-
-        network.selectNodes([nodeId]);
-        network.focus(nodeId, {
-          scale: 1.2,
-          animation: { duration: 700, easingFunction: "easeInOutQuad" },
-        });
-
-        // Active node color
-        network.body.data.nodes.update({
-          id: nodeId,
-          color: { background: "#e74c3c" },
-          label: `Node ${nodeId}\n(${i + 1})`,
-          font: { color: "#ffffff", size: 14 },
-        });
-
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Visited node color
-        network.body.data.nodes.update({
-          id: nodeId,
-          color: { background: "#2ecc71" },
-        });
-      }
-
-      network.unselectAll();
-      setCurrentStep(-1);
-    };
-
-    highlightTraversal();
-  }, [order]);
+  }, [isRunning, setIsRunning, order]);
 
   return (
     <div className="relative w-full h-full border rounded-lg shadow-lg">
       <div ref={containerRef} className="w-full h-full" />
-      {currentStep >= 0 && (
+      {currentStep >= 0 && currentStep < orderRef.current.length && (
         <div className="absolute bottom-2 left-2 bg-white px-3 py-2 rounded-lg shadow text-sm font-medium text-gray-700">
           Traversing Node:{" "}
-          <span className="font-bold">{order[currentStep]}</span> (
-          {currentStep + 1}/{order.length})
+          <span className="font-bold">{orderRef.current[currentStep]}</span> (
+          {currentStep + 1}/{orderRef.current.length})
         </div>
       )}
     </div>

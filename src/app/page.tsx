@@ -8,10 +8,22 @@ import { graphData } from "../components/graphConfig";
 
 export default function GraphVisualizer() {
   const [algorithm, setAlgorithm] = useState<"bfs" | "dfs">("bfs");
-  const [language, setLanguage] = useState<string>("javascript"); // Kept as a string
+  const [language, setLanguage] = useState<string>("javascript");
   const [order, setOrder] = useState<string[]>([]);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
 
+  const changeAlgorithm = (alg: "bfs" | "dfs") => {
+    // Stop any running traversal when changing algorithms
+    if (isRunning) {
+      setIsRunning(false);
+    }
+    setAlgorithm(alg);
+  };
+  
   const runAlgorithm = () => {
+    // If already running, don't start another traversal
+    if (isRunning) return;
+    
     const visited = new Set<string>();
     const traversalOrder: string[] = [];
 
@@ -22,7 +34,9 @@ export default function GraphVisualizer() {
         if (node && !visited.has(node)) {
           visited.add(node);
           traversalOrder.push(node);
-          queue.push(...(graphData[node] || []));
+          const neighbors = graphData[node] || [];
+          // For BFS, we need to sort the neighbors to ensure consistent visual traversal
+          queue.push(...neighbors);
         }
       }
     } else {
@@ -30,12 +44,18 @@ export default function GraphVisualizer() {
         if (visited.has(node)) return;
         visited.add(node);
         traversalOrder.push(node);
-        (graphData[node] || []).forEach(dfs);
+        const neighbors = graphData[node] || [];
+        neighbors.forEach(dfs);
       };
       dfs("1");
     }
 
+    // Set order first, then set isRunning to trigger the animation
     setOrder(traversalOrder);
+    // Use a short timeout to ensure React updates the order first
+    setTimeout(() => {
+      setIsRunning(true);
+    }, 50);
   };
 
   return (
@@ -50,9 +70,10 @@ export default function GraphVisualizer() {
           <AlgorithmControls
             algorithm={algorithm}
             language={language}
-            setAlgorithm={setAlgorithm}
-            setLanguage={setLanguage} // Accepts a string
+            setAlgorithm={changeAlgorithm}
+            setLanguage={setLanguage}
             runAlgorithm={runAlgorithm}
+            isRunning={isRunning}
           />
         </div>
 
@@ -65,7 +86,11 @@ export default function GraphVisualizer() {
       {/* Right side: Graph View */}
       <div className="w-1/2 h-full flex items-center justify-center">
         <div className="w-full h-full">
-          <GraphView order={order} />
+          <GraphView 
+            order={order} 
+            isRunning={isRunning} 
+            setIsRunning={setIsRunning} 
+          />
         </div>
       </div>
     </div>
